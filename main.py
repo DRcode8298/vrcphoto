@@ -4,7 +4,7 @@ import tkinter as tk
 from tkinter import filedialog, ttk, messagebox
 from watchdog.observers import Observer
 from watchdog.events import FileSystemEventHandler
-from converter import convert_png_with_metadata  # ←ここ注意
+from converter import convert_png_with_metadata
 from vrchat_log_parser import extract_players_with_ids
 import re
 import time
@@ -126,7 +126,49 @@ class VRChatExifGUI:
         save_config(self.config_data)
         messagebox.showinfo("保存完了", "設定を保存しました。")
 
-    # ↓ 以下、細かい関数 select_xxx などはそのままなので省略します（要望があれば書きます）
+    # ========== 省略されてた選択ダイアログ ==========
+    def select_log_folder(self):
+        path = filedialog.askdirectory()
+        if path:
+            self.realtime_log_dir.delete(0, tk.END)
+            self.realtime_log_dir.insert(0, path)
+
+    def select_log_folder_batch(self):
+        path = filedialog.askdirectory()
+        if path:
+            self.batch_log_dir.delete(0, tk.END)
+            self.batch_log_dir.insert(0, path)
+
+    def select_log_folder_options(self):
+        path = filedialog.askdirectory()
+        if path:
+            self.opt_log_dir.delete(0, tk.END)
+            self.opt_log_dir.insert(0, path)
+
+    def select_output_dir(self):
+        path = filedialog.askdirectory()
+        if path:
+            self.realtime_out.delete(0, tk.END)
+            self.realtime_out.insert(0, path)
+
+    def select_output_dir_batch(self):
+        path = filedialog.askdirectory()
+        if path:
+            self.batch_out.delete(0, tk.END)
+            self.batch_out.insert(0, path)
+
+    def select_output_dir_options(self):
+        path = filedialog.askdirectory()
+        if path:
+            self.opt_output_dir.delete(0, tk.END)
+            self.opt_output_dir.insert(0, path)
+
+    def select_input_dir(self):
+        path = filedialog.askdirectory()
+        if path:
+            self.batch_input.delete(0, tk.END)
+            self.batch_input.insert(0, path)
+    # ========== 選択ダイアログここまで ==========
 
     def toggle_watch(self):
         global observer_instance, watcher_thread

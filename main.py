@@ -11,11 +11,37 @@ import time
 import json
 from playsound3 import playsound
 from datetime import datetime
+from tkinter.scrolledtext import ScrolledText  # ← これが必要
+import sys
+import threading
+import pystray
+from PIL import Image, ImageDraw
 
-CONFIG_FILE = "config.json"
+CONFIG_FILE = "items/config.json"
 
 watcher_thread = None
 observer_instance = None
+
+# === ウィンドウ非表示関数の追加 ===
+def create_tray_icon(app):
+    def create_image():
+        img = Image.open("items/icon.ico")
+        return img
+
+    def on_show(icon, item):
+        app.root.after(0, app.root.deiconify)
+
+    def on_exit(icon, item):
+        icon.stop()
+        app.root.quit()
+
+    icon = pystray.Icon("vrc_photo")
+    icon.icon = create_image()
+    icon.menu = pystray.Menu(
+        pystray.MenuItem('表示', on_show),
+        pystray.MenuItem('終了', on_exit)
+    )
+    icon.run()
 
 def get_latest_log_file(log_dir):
     txt_files = [f for f in os.listdir(log_dir) if f.endswith('.txt')]
@@ -39,6 +65,17 @@ def save_config(config):
     with open(CONFIG_FILE, "w", encoding="utf-8") as f:
         json.dump(config, f, ensure_ascii=False, indent=2)
 
+class ConsoleRedirect:
+    def __init__(self, text_widget):
+        self.text_widget = text_widget
+
+    def write(self, message):
+        self.text_widget.after(0, self.text_widget.insert, tk.END, message)
+        self.text_widget.after(0, self.text_widget.see, tk.END)
+
+    def flush(self):
+        pass
+
 class VRChatExifGUI:
     def __init__(self, root):
         self.root = root
@@ -58,7 +95,24 @@ class VRChatExifGUI:
         self.setup_realtime_tab()
         self.setup_batch_tab()
         self.setup_options_tab()
-        self.watching = False
+        self.watching = False #初期化
+        self.start_realtime_watch()
+        self.watching = True
+        self.watch_btn.config(text="監視停止")
+
+        # ログ表示セクション追加
+        self.log_frame = ttk.Frame(root)
+        self.log_frame.pack(fill='both', expand=False)
+
+        self.log_toggle_btn = ttk.Button(self.log_frame, text="ログ表示", command=self.toggle_log)
+        self.log_toggle_btn.pack(anchor='w')
+
+        self.log_widget = ScrolledText(self.log_frame, height=10)
+        self.log_widget.pack(fill='both', expand=True)
+        self.log_widget.pack_forget()  # 初期は非表示
+        
+        sys.stdout = ConsoleRedirect(self.log_widget)
+        sys.stderr = ConsoleRedirect(self.log_widget)
 
     def setup_realtime_tab(self):
         ttk.Label(self.tab_realtime, text="ログフォルダ").pack()
@@ -125,6 +179,14 @@ class VRChatExifGUI:
         self.config_data["output_dir"] = self.opt_output_dir.get()
         save_config(self.config_data)
         messagebox.showinfo("保存完了", "設定を保存しました。")
+
+    def toggle_log(self):
+        if self.log_widget.winfo_ismapped():
+            self.log_widget.pack_forget()
+            self.log_toggle_btn.config(text="ログ表示")
+        else:
+            self.log_widget.pack(fill='both', expand=True)
+            self.log_toggle_btn.config(text="ログ非表示")
 
     # ========== 省略されてた選択ダイアログ ==========
     def select_log_folder(self):
@@ -224,7 +286,7 @@ class VRChatExifGUI:
                                             delete_png=config.get("delete_png", False),
                                             save_as_avif=config.get("compress_png", False)
                                         )
-                                        playsound("success.mp3")
+                                        playsound("items/success.mp3")
 
         observer_instance = Observer()
         handler = FolderWatcher(log_dir)
@@ -251,8 +313,7 @@ class VRChatExifGUI:
                 out_path = os.path.join(base_output_dir, out_base + out_ext)
 
                 if os.path.exists(out_path):
-                    if abs(os.path.getmtime(png_path) - os.path.getmtime(out_path)) < 60:
-                        continue  # 1分以内ならスキップ
+                    continue
 
                 matched_log = None
                 for log_file in log_files:
@@ -277,9 +338,18 @@ class VRChatExifGUI:
                                               save_as_avif=config.get("compress_png", False))
 
         messagebox.showinfo("一括変換", "作業が完了しました。")
-        playsound("success.mp3")
+        playsound("items/success.mp3")
 
 if __name__ == '__main__':
     root = tk.Tk()
     app = VRChatExifGUI(root)
+
+    def hide_window():
+        root.withdraw()
+
+    root.protocol("WM_DELETE_WINDOW", hide_window)
+
+    # トレイスレッド開始
+    threading.Thread(target=create_tray_icon, args=(app,), daemon=True).start()
+
     root.mainloop()
